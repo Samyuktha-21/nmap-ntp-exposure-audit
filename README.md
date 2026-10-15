@@ -1,30 +1,29 @@
-# NTP Exposure Audit — Nmap NSE Scripts
+# NTP Detection — Nmap NSE Scripts
 
-Two Nmap Scripting Engine (NSE) scripts that enhance the built-in
-`ntp-info.nse` into **scored NTP exposure auditors**. Instead of only listing
-what an NTP server reports, they judge *how exposed* the server is and give a
-rating an analyst can act on.
+Two Nmap Scripting Engine (NSE) scripts that enhance basic NTP detection on
+UDP port 123. They build on the idea of Nmap's built-in `ntp-info.nse`: instead
+of only confirming that an NTP service replied, they parse the NTP header and
+report useful details about the server.
 
-Both scripts are **detection only** — they send one or two small, standard NTP
-queries and read the reply. They make no changes to the target and send no
-traffic toward any third party. Use them only against hosts you own or are
-authorised to test.
+Both scripts are **discovery / safe** — they send one standard NTP client
+request and read the reply. They make no changes to the target. Use them only
+against hosts you own or are authorised to test.
 
 ## Scripts
 
 | Script | Enhancement | What it reports |
 |--------|-------------|-----------------|
-| `ntp-info-exposure.nse` | Information-disclosure auditor | Scores how much an anonymous client can fingerprint the host (ntpd build, OS, CPU, upstream refid) and rates it LOW / MEDIUM / HIGH. |
-| `ntp-amp-exposure.nse` | Amplification auditor | Detects whether the server answers mode-6 readvar and mode-7 `monlist` queries, measures the response-to-request size ratio, and flags the classic CVE-2013-5211 amplification exposure. |
+| `ntp-detect.nse` | Header parsing | Confirms the NTP service and reports leap indicator, version, mode and stratum from the reply. |
+| `ntp-detect-version.nse` | Timeout arg + version detection | Adds a configurable timeout (`ntp-detect.timeout`) and feeds the NTP version and stratum into Nmap's service/version (`-sV`) output. |
 
 ## Usage
 
 ```
-# Information-disclosure exposure
-nmap -sU -p 123 --script ./ntp-info-exposure.nse <target>
+# Header-parsing detection
+nmap -sU -p 123 --script ./ntp-detect.nse <target>
 
-# Amplification exposure
-nmap -sU -p 123 --script ./ntp-amp-exposure.nse <target>
+# With version detection and a custom timeout
+nmap -sU -p 123 --script ./ntp-detect-version.nse --script-args ntp-detect.timeout=5000 <target>
 ```
 
 To run them like any other NSE script, copy them into the Nmap `scripts/`
@@ -32,19 +31,17 @@ directory and run `nmap --script-updatedb`.
 
 ## Base / reference script
 
-These build on the behaviour of Nmap's built-in `ntp-info.nse`, which sends a
-mode-3 time request and a mode-6 read-variables request to collect NTP
-variables. The reference script ships with Nmap and is not included here.
+These build on the behaviour of Nmap's built-in `ntp-info.nse`, which queries
+an NTP server for its time and configuration variables. The reference script
+ships with Nmap and is not included here.
 
 ## Conclusion
 
-Starting from Nmap's built-in `ntp-info` and asking "so how bad is this?" turns
-a simple variable dump into two auditors that give a verdict: one scores how
-much an NTP server reveals about itself (information disclosure), and the other
-flags whether it can be abused to amplify an attack (CVE-2013-5211). The same
-NTP conversation, read through a security lens and scored, becomes something a
-defender can prioritise and fix — while the scripts stay honest about what they
-do and never attack a third party.
+Starting from a plain "is an NTP service here?" check, these two scripts turn a
+bare detection into something more useful: one reads the NTP header and reports
+the server's version, mode and stratum; the other makes the probe configurable
+and wires the result into Nmap's own version detection. The same single NTP
+request, parsed properly, gives an analyst real detail instead of just a yes/no.
 
 ## Acknowledgements
 
@@ -58,8 +55,7 @@ do and never attack a third party.
   work builds on.
 - My peers, friends and family — for their suggestions, testing help and
   constant support.
-- References: the official Nmap NSE documentation, the NTP RFCs, and the
-  CVE-2013-5211 advisory.
+- References: the official Nmap NSE documentation and the NTP RFCs.
 
 ## Author
 
